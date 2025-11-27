@@ -21,9 +21,9 @@ from enum import Enum
 # Import layout from generated file
 from generated_parking_zones import PARKING_ZONES, BUILDINGS, ROADS, ENTRY_GATE, EXIT_GATE
 
-# Window settings - reasonable size
-WINDOW_WIDTH = 1400
-WINDOW_HEIGHT = 900
+# Window settings - smaller size for laptops and smaller screens
+WINDOW_WIDTH = 1024
+WINDOW_HEIGHT = 768
 FPS = 60
 
 START_TIME_HOUR = 6
@@ -45,9 +45,10 @@ LIGHT_GRAY = (211, 211, 211)
 PURPLE = (128, 0, 128)
 TRUCK_RED = (220, 50, 50)
 
-CAR_COLORS = [(255, 255, 255), (128, 128, 128), (0, 0, 0), (200, 200, 200), (0, 0, 139)]
-MOTORCYCLE_COLORS = [(0, 0, 0), (255, 0, 0), (0, 0, 255), (128, 128, 128), (255, 165, 0)]
-TRUCK_COLORS = [(255, 255, 255), (0, 100, 0), (139, 69, 19)]
+# Single color per vehicle type
+CAR_COLOR = (30, 144, 255)  # Blue
+MOTORCYCLE_COLOR = (255, 69, 0)  # Red-Orange
+TRUCK_COLOR = (34, 139, 34)  # Forest Green
 
 # Calculate capacities
 TOTAL_MC_CAPACITY = sum(z["capacity"] for z in PARKING_ZONES if z["zone_type"] == "motorcycle")
@@ -110,11 +111,11 @@ class Vehicle:
     def __post_init__(self):
         if self.color is None:
             if self.type == 'car':
-                self.color = random.choice(CAR_COLORS)
+                self.color = CAR_COLOR
             elif self.type == 'truck':
-                self.color = random.choice(TRUCK_COLORS)
+                self.color = TRUCK_COLOR
             else:
-                self.color = random.choice(MOTORCYCLE_COLORS)
+                self.color = MOTORCYCLE_COLOR
         if self.path is None:
             self.path = []
 
@@ -773,13 +774,13 @@ class CNSCCustomSimulation:
             w = int(zone.width * self.zoom)
             h = int(zone.height * self.zoom)
 
-            # Zone color based on type
+            # Zone color based on type - light colors
             if zone.type == "motorcycle":
-                color = YELLOW
+                color = (255, 253, 208)  # Light yellow
             elif zone.type == "car":
-                color = PURPLE
+                color = (221, 160, 221)  # Light purple (plum)
             else:  # truck
-                color = TRUCK_RED
+                color = (255, 182, 193)  # Light pink
 
             # Darken if full
             util = zone.get_utilization()
