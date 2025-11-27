@@ -1,0 +1,41 @@
+{
+  "timestamp": "20251127_202405",
+  "iterations": 1000,
+  "total_capacity": 231,
+  "mc_capacity": 140,
+  "car_capacity": 81,
+  "truck_capacity": 10,
+  "hourly_arrival_rates": {
+    "6": 15,
+    "7": 100,
+    "8": 40,
+    "9": 25,
+    "10": 15,
+    "11": 10,
+    "12": 60,
+    "13": 30,
+    "14": 15,
+    "15": 8,
+    "16": 5,
+    "17": 2
+  },
+  "vehicle_distribution": {
+    "motorcycle": 0.76,
+    "car": 0.2,
+    "truck": 0.04
+  },
+  "peak_hours": [
+    7,
+    8,
+    12,
+    13
+  ],
+  "simulation_parameters": {
+    "start_hour": 6,
+    "end_hour": 19,
+    "time_step_seconds": 60,
+    "data_collection_interval_seconds": 600,
+    "max_search_attempts": 4,
+    "circling_timeout_seconds": 300
+  }
+}

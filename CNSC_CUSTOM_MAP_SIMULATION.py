@@ -11,9 +11,6 @@ import pygame
 import numpy as np
 import random
 import math
-import threading
-import tkinter as tk
-from tkinter import ttk
 from dataclasses import dataclass
 from typing import List, Tuple
 from enum import Enum
@@ -22,7 +19,9 @@ from enum import Enum
 from generated_parking_zones import PARKING_ZONES, BUILDINGS, ROADS, ENTRY_GATE, EXIT_GATE
 
 # Window settings - smaller size for laptops and smaller screens
-WINDOW_WIDTH = 1024
+MAP_WIDTH = 1024
+LEGEND_PANEL_WIDTH = 276
+WINDOW_WIDTH = MAP_WIDTH + LEGEND_PANEL_WIDTH  # 1300 total
 WINDOW_HEIGHT = 768
 FPS = 60
 
@@ -365,155 +364,6 @@ class RoadNetwork:
         return path
 
 
-class StatsWindow:
-    """Separate tkinter window for simulation stats"""
-    def __init__(self, simulation):
-        self.sim = simulation
-        self.root = tk.Tk()
-        self.root.title("Simulation Stats & Controls")
-        self.root.geometry("350x450+50+50")  # Position at top-left corner, more visible
-        self.root.resizable(False, False)
-        self.root.configure(bg='#2b2b2b')
-
-        # Make window always on top so it's always visible
-        self.root.attributes('-topmost', True)
-        self.root.lift()
-        self.root.focus_force()
-
-        self.setup_ui()
-        self.running = True
-
-    def setup_ui(self):
-        # Title
-        title = tk.Label(self.root, text="SIMULATION STATS", font=('Arial', 16, 'bold'),
-                        fg='white', bg='#2b2b2b')
-        title.pack(pady=10)
-
-        # Time Frame
-        time_frame = tk.Frame(self.root, bg='#3d5a80', relief='ridge', bd=2)
-        time_frame.pack(fill='x', padx=10, pady=5)
-
-        self.day_label = tk.Label(time_frame, text="Day 1", font=('Arial', 14, 'bold'),
-                                  fg='white', bg='#3d5a80')
-        self.day_label.pack(pady=5)
-
-        self.time_label = tk.Label(time_frame, text="06:00 AM", font=('Arial', 24, 'bold'),
-                                   fg='yellow', bg='#3d5a80')
-        self.time_label.pack(pady=5)
-
-        self.peak_label = tk.Label(time_frame, text="", font=('Arial', 10),
-                                   fg='red', bg='#3d5a80')
-        self.peak_label.pack(pady=2)
-
-        # Stats Frame
-        stats_frame = tk.LabelFrame(self.root, text="Statistics", font=('Arial', 11, 'bold'),
-                                    fg='white', bg='#2b2b2b')
-        stats_frame.pack(fill='x', padx=10, pady=10)
-
-        self.capacity_label = tk.Label(stats_frame, text=f"Capacity: {TOTAL_CAPACITY} (MC:{TOTAL_MC_CAPACITY} C:{TOTAL_CAR_CAPACITY} T:{TOTAL_TRUCK_CAPACITY})",
-                                       font=('Arial', 10), fg='lightgray', bg='#2b2b2b')
-        self.capacity_label.pack(anchor='w', padx=10, pady=2)
-
-        self.arrivals_label = tk.Label(stats_frame, text="Arrivals: 0", font=('Arial', 11),
-                                       fg='lightgreen', bg='#2b2b2b')
-        self.arrivals_label.pack(anchor='w', padx=10, pady=2)
-
-        self.parked_label = tk.Label(stats_frame, text="Parked: 0", font=('Arial', 11),
-                                     fg='cyan', bg='#2b2b2b')
-        self.parked_label.pack(anchor='w', padx=10, pady=2)
-
-        self.inside_label = tk.Label(stats_frame, text="Currently Inside: 0", font=('Arial', 11),
-                                     fg='yellow', bg='#2b2b2b')
-        self.inside_label.pack(anchor='w', padx=10, pady=2)
-
-        self.rejected_label = tk.Label(stats_frame, text="Rejected: 0", font=('Arial', 11),
-                                       fg='red', bg='#2b2b2b')
-        self.rejected_label.pack(anchor='w', padx=10, pady=2)
-
-        # Speed Frame
-        speed_frame = tk.LabelFrame(self.root, text="Speed Control", font=('Arial', 11, 'bold'),
-                                    fg='white', bg='#2b2b2b')
-        speed_frame.pack(fill='x', padx=10, pady=10)
-
-        speed_row = tk.Frame(speed_frame, bg='#2b2b2b')
-        speed_row.pack(pady=10)
-
-        self.btn_slower = tk.Button(speed_row, text=" - ", font=('Arial', 16, 'bold'),
-                                    bg='#c44', fg='white', width=4, command=self.speed_down)
-        self.btn_slower.pack(side='left', padx=10)
-
-        self.speed_label = tk.Label(speed_row, text="60x", font=('Arial', 18, 'bold'),
-                                    fg='yellow', bg='#2b2b2b', width=6)
-        self.speed_label.pack(side='left', padx=10)
-
-        self.btn_faster = tk.Button(speed_row, text=" + ", font=('Arial', 16, 'bold'),
-                                    bg='#4c4', fg='white', width=4, command=self.speed_up)
-        self.btn_faster.pack(side='left', padx=10)
-
-        # Control Buttons
-        ctrl_frame = tk.Frame(self.root, bg='#2b2b2b')
-        ctrl_frame.pack(fill='x', padx=10, pady=10)
-
-        self.btn_pause = tk.Button(ctrl_frame, text="PAUSE", font=('Arial', 12, 'bold'),
-                                   bg='#666', fg='white', width=12, command=self.toggle_pause)
-        self.btn_pause.pack(side='left', padx=10)
-
-        self.btn_reset = tk.Button(ctrl_frame, text="RESET", font=('Arial', 12, 'bold'),
-                                   bg='#844', fg='white', width=12, command=self.reset_sim)
-        self.btn_reset.pack(side='left', padx=10)
-
-    def speed_up(self):
-        self.sim.speed = min(300, self.sim.speed + 30)
-
-    def speed_down(self):
-        self.sim.speed = max(30, self.sim.speed - 30)
-
-    def toggle_pause(self):
-        self.sim.paused = not self.sim.paused
-
-    def reset_sim(self):
-        self.sim.reset()
-
-    def update(self):
-        if not self.running:
-            return
-
-        # Update time
-        self.day_label.config(text=f"Day {self.sim.current_day}")
-        self.time_label.config(text=self.sim.get_current_time_string())
-
-        # Peak hour indicator
-        if self.sim.is_peak_hour():
-            self.peak_label.config(text="PEAK HOUR", fg='red')
-        else:
-            self.peak_label.config(text="")
-
-        # Update stats
-        self.arrivals_label.config(text=f"Arrivals: {self.sim.total_arrivals}")
-        self.parked_label.config(text=f"Parked: {self.sim.total_parked}")
-        self.inside_label.config(text=f"Currently Inside: {len(self.sim.vehicles)}")
-        self.rejected_label.config(text=f"Rejected: {self.sim.total_rejected}")
-
-        # Update speed
-        self.speed_label.config(text=f"{self.sim.speed}x")
-
-        # Update pause button
-        if self.sim.paused:
-            self.btn_pause.config(text="RESUME", bg='#a84')
-        else:
-            self.btn_pause.config(text="PAUSE", bg='#666')
-
-        # Schedule next update
-        self.root.after(100, self.update)
-
-    def close(self):
-        self.running = False
-        try:
-            self.root.destroy()
-        except:
-            pass  # Already destroyed
-
-
 class CNSCCustomSimulation:
     def __init__(self):
         pygame.init()
@@ -560,8 +410,8 @@ class CNSCCustomSimulation:
             max((r["y"] + r["height"]) for r in ROADS)
         )
 
-        # Calculate zoom to fit entire map (no side panel, full width)
-        usable_width = WINDOW_WIDTH - 40  # Small margin
+        # Calculate zoom to fit entire map (use only MAP_WIDTH, not legend panel)
+        usable_width = MAP_WIDTH - 40  # Small margin
         usable_height = WINDOW_HEIGHT - 40
 
         zoom_x = usable_width / max_x
@@ -570,6 +420,12 @@ class CNSCCustomSimulation:
 
         self.view_offset_x = 15
         self.view_offset_y = 15
+
+        # Button rectangles for mouse interaction
+        self.btn_speed_down = None
+        self.btn_speed_up = None
+        self.btn_pause = None
+        self.btn_reset = None
 
     def get_current_hour(self):
         return int(self.sim_time // 3600) % 24
@@ -829,9 +685,9 @@ class CNSCCustomSimulation:
                 elif vehicle.type == 'car':
                     size = (int(24 * self.zoom), int(14 * self.zoom))
                 else:  # motorcycle
-                    size = (int(14 * self.zoom), int(8 * self.zoom))
+                    size = (int(22 * self.zoom), int(12 * self.zoom))  # Increased from 14x8 to 22x12
                 # Minimum size
-                size = (max(size[0], 6), max(size[1], 4))
+                size = (max(size[0], 8), max(size[1], 5))
 
             rect = pygame.Rect(x - size[0]//2, y - size[1]//2, size[0], size[1])
             pygame.draw.rect(self.screen, vehicle.color, rect, border_radius=1)
@@ -843,16 +699,223 @@ class CNSCCustomSimulation:
         pygame.draw.rect(self.screen, (30, 30, 40), (5, WINDOW_HEIGHT - 25, hint.get_width() + 10, 22))
         self.screen.blit(hint, (10, WINDOW_HEIGHT - 22))
 
+    def draw_legend_panel(self):
+        """Draw legend panel with stats and legends on the right side"""
+        panel_x = MAP_WIDTH
+        panel_y = 0
+        panel_bg = (45, 52, 64)  # Dark blue-gray background (modern dark theme)
+
+        # Draw panel background
+        pygame.draw.rect(self.screen, panel_bg, (panel_x, panel_y, LEGEND_PANEL_WIDTH, WINDOW_HEIGHT))
+        pygame.draw.line(self.screen, (100, 110, 125), (panel_x, 0), (panel_x, WINDOW_HEIGHT), 2)
+
+        y_offset = 15
+
+        # ========== STATS SECTION ==========
+        stats_title = self.font_title.render("SIMULATION STATS", True, (230, 230, 230))
+        self.screen.blit(stats_title, (panel_x + 30, y_offset))
+        y_offset += 35
+
+        # Day and Time box
+        time_box_y = y_offset
+        pygame.draw.rect(self.screen, (35, 42, 54), (panel_x + 10, time_box_y, LEGEND_PANEL_WIDTH - 20, 95), border_radius=5)
+        pygame.draw.rect(self.screen, (80, 90, 105), (panel_x + 10, time_box_y, LEGEND_PANEL_WIDTH - 20, 95), 2, border_radius=5)
+
+        # Day
+        day_text = self.font.render(f"Day {self.current_day}", True, WHITE)
+        self.screen.blit(day_text, (panel_x + LEGEND_PANEL_WIDTH // 2 - day_text.get_width() // 2, time_box_y + 10))
+
+        # Time (big)
+        time_text = self.font_large.render(self.get_current_time_string(), True, YELLOW)
+        self.screen.blit(time_text, (panel_x + LEGEND_PANEL_WIDTH // 2 - time_text.get_width() // 2, time_box_y + 35))
+
+        # Peak hour indicator
+        if self.is_peak_hour():
+            peak_text = self.font_small.render("PEAK HOUR", True, RED)
+            self.screen.blit(peak_text, (panel_x + LEGEND_PANEL_WIDTH // 2 - peak_text.get_width() // 2, time_box_y + 75))
+
+        y_offset += 105
+
+        # Statistics
+        stats_items = [
+            (f"Capacity: {TOTAL_CAPACITY}", (180, 180, 180)),
+            (f"MC:{TOTAL_MC_CAPACITY} C:{TOTAL_CAR_CAPACITY} T:{TOTAL_TRUCK_CAPACITY}", (160, 160, 160)),
+            (f"Arrivals: {self.total_arrivals}", (100, 230, 100)),
+            (f"Parked: {self.total_parked}", (100, 220, 220)),
+            (f"Currently Inside: {len(self.vehicles)}", (255, 220, 100)),
+            (f"Rejected: {self.total_rejected}", (255, 120, 120)),
+        ]
+
+        for stat_text, color in stats_items:
+            stat_label = self.font_small.render(stat_text, True, color)
+            self.screen.blit(stat_label, (panel_x + 15, y_offset))
+            y_offset += 20
+
+        # Speed indicator
+        y_offset += 5
+        speed_text = self.font.render(f"Speed: {self.speed}x", True, (255, 200, 100))
+        self.screen.blit(speed_text, (panel_x + 15, y_offset))
+        y_offset += 25
+
+        # Control buttons
+        btn_y = y_offset
+        btn_width = 50
+        btn_height = 30
+        btn_spacing = 10
+
+        # Speed control buttons
+        # [-] button
+        self.btn_speed_down = pygame.Rect(panel_x + 15, btn_y, btn_width, btn_height)
+        btn_color = (204, 68, 68) if self.speed > 30 else (150, 150, 150)
+        pygame.draw.rect(self.screen, btn_color, self.btn_speed_down, border_radius=5)
+        pygame.draw.rect(self.screen, BLACK, self.btn_speed_down, 2, border_radius=5)
+        minus_text = self.font.render("-", True, WHITE)
+        self.screen.blit(minus_text, (self.btn_speed_down.centerx - minus_text.get_width()//2,
+                                      self.btn_speed_down.centery - minus_text.get_height()//2))
+
+        # Speed display
+        speed_display_x = panel_x + 15 + btn_width + btn_spacing
+        speed_display = self.font.render(f"{self.speed}x", True, (255, 200, 100))
+        self.screen.blit(speed_display, (speed_display_x, btn_y + 7))
+
+        # [+] button
+        self.btn_speed_up = pygame.Rect(panel_x + 15 + btn_width + btn_spacing + 50, btn_y, btn_width, btn_height)
+        btn_color = (68, 204, 68) if self.speed < 300 else (150, 150, 150)
+        pygame.draw.rect(self.screen, btn_color, self.btn_speed_up, border_radius=5)
+        pygame.draw.rect(self.screen, BLACK, self.btn_speed_up, 2, border_radius=5)
+        plus_text = self.font.render("+", True, WHITE)
+        self.screen.blit(plus_text, (self.btn_speed_up.centerx - plus_text.get_width()//2,
+                                     self.btn_speed_up.centery - plus_text.get_height()//2))
+
+        y_offset += btn_height + 15
+
+        # Pause/Resume and Reset buttons
+        btn_y2 = y_offset
+        btn_width2 = 115
+
+        # [PAUSE/RESUME] button
+        self.btn_pause = pygame.Rect(panel_x + 15, btn_y2, btn_width2, btn_height)
+        btn_color = (168, 136, 68) if self.paused else (102, 102, 102)
+        pygame.draw.rect(self.screen, btn_color, self.btn_pause, border_radius=5)
+        pygame.draw.rect(self.screen, BLACK, self.btn_pause, 2, border_radius=5)
+        pause_text = self.font_small.render("RESUME" if self.paused else "PAUSE", True, WHITE)
+        self.screen.blit(pause_text, (self.btn_pause.centerx - pause_text.get_width()//2,
+                                      self.btn_pause.centery - pause_text.get_height()//2))
+
+        # [RESET] button
+        self.btn_reset = pygame.Rect(panel_x + 15 + btn_width2 + btn_spacing, btn_y2, btn_width2, btn_height)
+        pygame.draw.rect(self.screen, (136, 68, 68), self.btn_reset, border_radius=5)
+        pygame.draw.rect(self.screen, BLACK, self.btn_reset, 2, border_radius=5)
+        reset_text = self.font_small.render("RESET", True, WHITE)
+        self.screen.blit(reset_text, (self.btn_reset.centerx - reset_text.get_width()//2,
+                                      self.btn_reset.centery - reset_text.get_height()//2))
+
+        y_offset += btn_height + 15
+
+        # Separator line
+        pygame.draw.line(self.screen, (80, 90, 105), (panel_x + 10, y_offset), (panel_x + LEGEND_PANEL_WIDTH - 10, y_offset), 2)
+        y_offset += 15
+
+        # ========== LEGEND SECTION ==========
+        legend_title = self.font_title.render("LEGEND", True, (230, 230, 230))
+        self.screen.blit(legend_title, (panel_x + 90, y_offset))
+        y_offset += 30
+
+        # --- Vehicle Colors Section ---
+        section_title = self.font.render("Vehicle Colors:", True, (200, 200, 200))
+        self.screen.blit(section_title, (panel_x + 10, y_offset))
+        y_offset += 30
+
+        # Cars - Blue
+        pygame.draw.rect(self.screen, CAR_COLOR, (panel_x + 20, y_offset, 30, 18), border_radius=2)
+        pygame.draw.rect(self.screen, (80, 90, 105), (panel_x + 20, y_offset, 30, 18), 1, border_radius=2)
+        label = self.font_small.render("Cars", True, (220, 220, 220))
+        self.screen.blit(label, (panel_x + 60, y_offset + 2))
+        y_offset += 28
+
+        # Motorcycles - Red-Orange
+        pygame.draw.rect(self.screen, MOTORCYCLE_COLOR, (panel_x + 20, y_offset, 30, 18), border_radius=2)
+        pygame.draw.rect(self.screen, (80, 90, 105), (panel_x + 20, y_offset, 30, 18), 1, border_radius=2)
+        label = self.font_small.render("Motorcycles", True, (220, 220, 220))
+        self.screen.blit(label, (panel_x + 60, y_offset + 2))
+        y_offset += 28
+
+        # Trucks - Forest Green
+        pygame.draw.rect(self.screen, TRUCK_COLOR, (panel_x + 20, y_offset, 30, 18), border_radius=2)
+        pygame.draw.rect(self.screen, (80, 90, 105), (panel_x + 20, y_offset, 30, 18), 1, border_radius=2)
+        label = self.font_small.render("Trucks", True, (220, 220, 220))
+        self.screen.blit(label, (panel_x + 60, y_offset + 2))
+        y_offset += 40
+
+        # --- Parking Zone Colors Section ---
+        section_title = self.font.render("Parking Zones:", True, (200, 200, 200))
+        self.screen.blit(section_title, (panel_x + 10, y_offset))
+        y_offset += 30
+
+        # Motorcycle Parking - Light Yellow
+        pygame.draw.rect(self.screen, (255, 253, 208), (panel_x + 20, y_offset, 30, 18))
+        pygame.draw.rect(self.screen, (80, 90, 105), (panel_x + 20, y_offset, 30, 18), 1)
+        label = self.font_small.render("Motorcycle Parking", True, (220, 220, 220))
+        self.screen.blit(label, (panel_x + 60, y_offset + 2))
+        y_offset += 28
+
+        # Car Parking - Light Purple
+        pygame.draw.rect(self.screen, (221, 160, 221), (panel_x + 20, y_offset, 30, 18))
+        pygame.draw.rect(self.screen, (80, 90, 105), (panel_x + 20, y_offset, 30, 18), 1)
+        label = self.font_small.render("Car Parking", True, (220, 220, 220))
+        self.screen.blit(label, (panel_x + 60, y_offset + 2))
+        y_offset += 28
+
+        # Truck Parking - Light Pink
+        pygame.draw.rect(self.screen, (255, 182, 193), (panel_x + 20, y_offset, 30, 18))
+        pygame.draw.rect(self.screen, (80, 90, 105), (panel_x + 20, y_offset, 30, 18), 1)
+        label = self.font_small.render("Truck Parking", True, (220, 220, 220))
+        self.screen.blit(label, (panel_x + 60, y_offset + 2))
+        y_offset += 40
+
+        # --- Map Elements Section ---
+        section_title = self.font.render("Map Elements:", True, (200, 200, 200))
+        self.screen.blit(section_title, (panel_x + 10, y_offset))
+        y_offset += 30
+
+        # Entry Gate - Green Circle
+        pygame.draw.circle(self.screen, GREEN, (panel_x + 35, y_offset + 9), 9)
+        pygame.draw.circle(self.screen, (80, 90, 105), (panel_x + 35, y_offset + 9), 9, 1)
+        label = self.font_small.render("Entry Gate", True, (220, 220, 220))
+        self.screen.blit(label, (panel_x + 60, y_offset + 2))
+        y_offset += 28
+
+        # Exit Gate - Red Circle
+        pygame.draw.circle(self.screen, RED, (panel_x + 35, y_offset + 9), 9)
+        pygame.draw.circle(self.screen, (80, 90, 105), (panel_x + 35, y_offset + 9), 9, 1)
+        label = self.font_small.render("Exit Gate", True, (220, 220, 220))
+        self.screen.blit(label, (panel_x + 60, y_offset + 2))
+        y_offset += 28
+
+        # Roads - Dark Gray
+        pygame.draw.rect(self.screen, ROAD_GRAY, (panel_x + 20, y_offset, 30, 18))
+        pygame.draw.rect(self.screen, (80, 90, 105), (panel_x + 20, y_offset, 30, 18), 1)
+        label = self.font_small.render("Roads", True, (220, 220, 220))
+        self.screen.blit(label, (panel_x + 60, y_offset + 2))
+        y_offset += 28
+
+        # Buildings - Steel Blue
+        pygame.draw.rect(self.screen, BUILDING_BLUE, (panel_x + 20, y_offset, 30, 18))
+        pygame.draw.rect(self.screen, (80, 90, 105), (panel_x + 20, y_offset, 30, 18), 1)
+        label = self.font_small.render("Buildings", True, (220, 220, 220))
+        self.screen.blit(label, (panel_x + 60, y_offset + 2))
+
     def draw(self):
         self.screen.fill(GRASS_GREEN)
 
-        # Draw in order: roads, parking, buildings, vehicles, gates, UI
+        # Draw in order: roads, parking, buildings, vehicles, gates, UI, legend
         self.draw_roads()
         self.draw_parking_zones()
         self.draw_buildings()
         self.draw_vehicles()
         self.draw_gates()
         self.draw_ui()
+        self.draw_legend_panel()
 
         pygame.display.flip()
 
@@ -885,6 +948,27 @@ class CNSCCustomSimulation:
                     self.zoom = min(2.0, self.zoom + 0.1)
                 elif event.key == pygame.K_MINUS:
                     self.zoom = max(0.3, self.zoom - 0.1)
+
+            # Mouse click handling for buttons
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:  # Left click
+                mouse_pos = event.pos
+
+                # Speed down button
+                if self.btn_speed_down and self.btn_speed_down.collidepoint(mouse_pos):
+                    self.speed = max(30, self.speed - 30)
+
+                # Speed up button
+                elif self.btn_speed_up and self.btn_speed_up.collidepoint(mouse_pos):
+                    self.speed = min(300, self.speed + 30)
+
+                # Pause/Resume button
+                elif self.btn_pause and self.btn_pause.collidepoint(mouse_pos):
+                    self.paused = not self.paused
+
+                # Reset button
+                elif self.btn_reset and self.btn_reset.collidepoint(mouse_pos):
+                    self.reset()
+
         return True
 
     def reset(self):
@@ -901,8 +985,8 @@ class CNSCCustomSimulation:
             zone.parked_vehicles = []
             zone._init_slots()
 
-    def run(self, stats_window):
-        """Main loop - also updates tkinter stats window"""
+    def run(self):
+        """Main loop"""
         running = True
         while running:
             dt = self.clock.tick(FPS) / 1000.0
@@ -910,14 +994,6 @@ class CNSCCustomSimulation:
             self.update(dt)
             self.draw()
 
-            # Update tkinter (non-blocking)
-            try:
-                stats_window.root.update()
-            except tk.TclError:
-                # Stats window was closed
-                running = False
-
-        stats_window.close()
         pygame.quit()
 
 
@@ -931,10 +1007,8 @@ if __name__ == "__main__":
     print(f"  - Cars: {TOTAL_CAR_CAPACITY}")
     print(f"  - Trucks: {TOTAL_TRUCK_CAPACITY}")
     print(f"\nVehicles travel ONLY on roads!")
-    print("\nTwo windows will open:")
-    print("  1. MAP WINDOW - Shows parking simulation")
-    print("  2. STATS WINDOW - Shows stats & controls")
-    print("\nKeyboard shortcuts (on MAP window):")
+    print("\nStats and Legend panel on the right side!")
+    print("\nKeyboard shortcuts:")
     print("  SPACE = Pause/Resume")
     print("  UP/DOWN = Speed")
     print("  Arrow keys = Pan view")
@@ -943,12 +1017,6 @@ if __name__ == "__main__":
     print("  ESC = Exit")
     print("=" * 70)
 
-    # Create simulation first
+    # Create and run simulation
     sim = CNSCCustomSimulation()
-
-    # Create stats window (tkinter)
-    stats_win = StatsWindow(sim)
-    stats_win.update()  # Start update loop
-
-    # Run simulation
-    sim.run(stats_win)
+    sim.run()
